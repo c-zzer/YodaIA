@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mon IA</title>
+<title>Yoda IA</title>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f6f7f9;--side:#eceff3;--ink:#1b2430;--muted:#667085;--line:#dde2e9;--accent:#0f6b6b;--accent-ink:#fff;--user:#e3ebf0;--code:#fff;--err:#b42318;--k:#8250df;--s:#0a7a4b;--c:#8a94a3;color-scheme:light;font-family:"Hanken Grotesk",system-ui,sans-serif}
@@ -21,6 +21,7 @@ button:disabled{opacity:.5;cursor:default}:focus-visible{outline:2px solid var(-
 #list li{display:flex;align-items:center;gap:.25rem;border-radius:8px;padding:.1rem .1rem .1rem .6rem}
 #list li.on{background:var(--user)}#list li span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:.4rem 0}
 #list li button{border:0;padding:.25rem .4rem;color:var(--muted);font-size:.8rem}
+.brand{margin:0;font-size:1.15rem;font-weight:600}
 .muted{color:var(--muted);font-size:.8rem;margin:0}
 main{flex:1;display:flex;flex-direction:column;min-width:0}
 header{display:flex;align-items:center;gap:.75rem;padding:.7rem 1.25rem;border-bottom:1px solid var(--line)}
@@ -52,9 +53,10 @@ body.open #sidebar{transform:none}body.open #scrim{display:block;position:fixed;
 </head>
 <body>
 <aside id="sidebar" aria-label="Conversations">
+  <h2 class="brand">Yoda IA</h2>
   <button id="new" class="primary">Nouvelle conversation</button>
   <ul id="list"></ul>
-  <p class="muted">Connecté à votre serveur d’IA. Conversations enregistrées dans ce navigateur.</p>
+  <p class="muted">Modèle entraîné par vous, exécuté dans ce navigateur. Conversations enregistrées ici.</p>
 </aside>
 <div id="scrim"></div>
 <main>
@@ -66,6 +68,7 @@ body.open #sidebar{transform:none}body.open #scrim{display:block;position:fixed;
     <button id="send" class="primary" type="submit">Envoyer</button>
   </form>
 </main>
+<script src="gpt.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -81,22 +84,24 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(convs)); } c
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const getConv = () => convs.find((c) => c.id === current);
 
-// Adresse du serveur d’IA (ia-simple). Laissez '' si ce fichier est servi par ce même serveur.
-const API_URL = '';
-const getCode = () => { try { return localStorage.getItem('monia.code') || ''; } catch (e) { return ''; } };
+// Le modèle tourne dans ce navigateur : il charge modele.json + poids.bin (créés par export_web.py).
+let modelPromise = null;
+function loadModel() {
+  if (!modelPromise) modelPromise = (async () => {
+    const meta = await (await fetch('modele.json')).json();
+    const buf = await (await fetch('poids.bin')).arrayBuffer();
+    return new MiniGPTJS(meta, buf);
+  })().catch(() => { modelPromise = null; throw new Error('Impossible de charger le modèle (modele.json et poids.bin sont-ils dans le dossier public ?).'); });
+  return modelPromise;
+}
+const STOP = '\nUtilisateur:';
 async function answer(messages) {
-  const res = await fetch(API_URL.replace(/\/$/, '') + '/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-access-code': getCode() },
-    body: JSON.stringify({ messages: messages.slice(-20).map((m) => ({ role: m.role, content: m.content })) }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401) {
-    const c = prompt('Code d’accès'); if (c) { try { localStorage.setItem('monia.code', c); } catch (e) {} }
-    throw new Error('Code d’accès requis : renvoyez votre message.');
-  }
-  if (!res.ok) throw new Error(data.error || 'Erreur du serveur (' + res.status + ').');
-  return data.reply + (data.truncated ? '\n\n*[Réponse coupée : elle était trop longue.]*' : '');
+  const gpt = await loadModel();
+  // Le modèle continue un texte : on lui présente la conversation sous forme de dialogue.
+  const prompt = messages.slice(-6).map((m) => (m.role === 'user' ? 'Utilisateur: ' : 'Yoda IA: ') + m.content + '\n').join('') + 'Yoda IA:';
+  let out = await gpt.generate(gpt.encode(prompt), { maxNew: 300, temperature: 0.8, stop: STOP });
+  out = out.split(STOP)[0].trim();
+  return out || '…';
 }
 
 function newConv() {
@@ -173,7 +178,7 @@ async function send(text) {
     acc = await answer(c.messages);
     let shown = '';
     for (const w of acc.match(/\S+\s*/g) || []) { shown += w; wrap.replaceChild(md(shown), wrap.firstChild); chat.scrollTop = chat.scrollHeight; await new Promise((r) => setTimeout(r, 15)); }
-  } catch (e) { acc = ''; showError(e instanceof TypeError ? 'Connexion impossible : le serveur d’IA ne répond pas.' : e.message); }
+  } catch (e) { acc = ''; showError(e instanceof TypeError ? 'Chargement du modèle impossible. Vérifiez votre connexion.' : e.message); }
   const err = $('#banner').textContent;
   if (acc) c.messages.push({ role: 'assistant', content: acc }); else c.messages.pop();
   c.updated = Date.now(); save(); busy = false; $('#send').disabled = false; render();
