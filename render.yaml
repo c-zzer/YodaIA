@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ia-simple
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: PROVIDER
+        value: websearch        # mettre "anthropic" pour un vrai modèle (clé payante)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ACCESS_CODE
+        sync: false
