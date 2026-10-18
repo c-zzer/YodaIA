@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mon IA (version bête)</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f9;--side:#eceff3;--ink:#1b2430;--muted:#667085;--line:#dde2e9;--accent:#0f6b6b;--accent-ink:#fff;--user:#e3ebf0;--code:#fff;--err:#b42318;--k:#8250df;--s:#0a7a4b;--c:#8a94a3;color-scheme:light;font-family:"Hanken Grotesk",system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151a21;--side:#1b212a;--ink:#e6eaf0;--muted:#8d97a6;--line:#2a323d;--accent:#4fb3ac;--accent-ink:#0b1417;--user:#232c37;--code:#10141a;--err:#f97066;--k:#c4a1ff;--s:#7ee0b0;--c:#7d8796;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151a21;--side:#1b212a;--ink:#e6eaf0;--muted:#8d97a6;--line:#2a323d;--accent:#4fb3ac;--accent-ink:#0b1417;--user:#232c37;--code:#10141a;--err:#f97066;--k:#c4a1ff;--s:#7ee0b0;--c:#7d8796;color-scheme:dark}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{display:flex;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.55}
+button,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:transparent;border-radius:8px;padding:.45rem .8rem}
+button:hover{background:var(--user)}button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#sidebar{width:280px;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:1rem;gap:1rem;flex:none}
+#list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
+#list li{display:flex;align-items:center;gap:.25rem;border-radius:8px;padding:.1rem .1rem .1rem .6rem}
+#list li.on{background:var(--user)}#list li span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:.4rem 0}
+#list li button{border:0;padding:.25rem .4rem;color:var(--muted);font-size:.8rem}
+.muted{color:var(--muted);font-size:.8rem;margin:0}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+header{display:flex;align-items:center;gap:.75rem;padding:.7rem 1.25rem;border-bottom:1px solid var(--line)}
+header h1{font-size:1rem;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#menu,#scrim{display:none}
+#chat{flex:1;overflow:auto;padding:1.5rem 1.25rem}
+.msg{max-width:46rem;margin:0 auto 1.4rem}
+.msg.user .body{background:var(--user);border-radius:14px;padding:.6rem .9rem;white-space:pre-wrap;margin-left:auto;width:fit-content;max-width:90%}
+.msg.assistant .body>:first-child{margin-top:0}.msg.assistant .body>:last-child{margin-bottom:0}
+.tools button{border:0;padding:.1rem .4rem;font-size:.8rem;color:var(--muted)}
+.empty{max-width:46rem;margin:18vh auto 0;color:var(--muted)}.empty h2{color:var(--ink);font-weight:600;margin:0 0 .25rem}
+.dots::after{content:"●●●";letter-spacing:.2em;font-size:.6rem;color:var(--muted);animation:b 1.2s infinite}
+@keyframes b{50%{opacity:.25}}@media(prefers-reduced-motion:reduce){.dots::after{animation:none}}
+pre{position:relative;background:var(--code);border:1px solid var(--line);border-radius:8px;padding:.8rem;overflow:auto}
+pre code,code{font-family:"JetBrains Mono",monospace;font-size:.86rem}pre code{background:none}
+.msg p code,.msg li code{background:var(--user);padding:.1em .35em;border-radius:4px}
+pre .copy{position:absolute;top:.4rem;right:.4rem;font-size:.75rem;padding:.15rem .5rem;background:var(--bg)}
+.hljs-keyword,.hljs-built_in,.hljs-literal{color:var(--k)}.hljs-string,.hljs-number{color:var(--s)}.hljs-comment{color:var(--c)}
+.table{overflow-x:auto}table{border-collapse:collapse}td,th{border:1px solid var(--line);padding:.3rem .6rem}
+#banner{margin:0 auto .5rem;max-width:46rem;width:calc(100% - 2.5rem);color:var(--err);font-size:.9rem}
+#form{display:flex;gap:.5rem;align-items:flex-end;max-width:46rem;width:calc(100% - 2.5rem);margin:0 auto 1rem}
+#input{flex:1;resize:none;max-height:40vh;border:1px solid var(--line);background:var(--side);border-radius:12px;padding:.65rem .9rem}
+#send{height:2.6rem}
+@media(max-width:760px){
+#sidebar{position:fixed;inset:0 auto 0 0;z-index:3;transform:translateX(-100%);transition:transform .2s;padding-top:calc(1rem + env(safe-area-inset-top,0px))}
+body.open #sidebar{transform:none}body.open #scrim{display:block;position:fixed;inset:0;background:#0006;z-index:2}
+#menu{display:block;border:0;font-size:1.2rem;padding:.2rem .5rem}}
+</style>
+</head>
+<body>
+<aside id="sidebar" aria-label="Conversations">
+  <button id="new" class="primary">Nouvelle conversation</button>
+  <ul id="list"></ul>
+  <p class="muted">Version sans IA : recherche sur Wikipédia. Conversations enregistrées dans ce navigateur.</p>
+</aside>
+<div id="scrim"></div>
+<main>
+  <header><button id="menu" aria-label="Ouvrir les conversations">☰</button><h1 id="title">Nouvelle conversation</h1></header>
+  <div id="chat" role="log" aria-live="polite"></div>
+  <div id="banner" hidden></div>
+  <form id="form">
+    <textarea id="input" rows="1" placeholder="Écrivez votre message" aria-label="Message"></textarea>
+    <button id="send" class="primary" type="submit">Envoyer</button>
+  </form>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const KEY = 'monia.conversations';
+const SYSTEM = "Tu es un assistant conversationnel utile, clair et honnête. Tu réponds en français par défaut, sauf si l’utilisateur écrit dans une autre langue. Tu expliques simplement les sujets complexes, avec du Markdown et des blocs de code si nécessaire. Si tu ne sais pas, tu le dis.";
+const MAX_CHARS = 8000, MAX_HISTORY = 30;
+let convs = [], current = null, busy = false, sample = null, abort = null;
+try { convs = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { convs = []; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(convs)); } catch (e) {} };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const getConv = () => convs.find((c) => c.id === current);
+
+async function answer(q) {
+  const u = new URL('https://fr.wikipedia.org/w/api.php');
+  Object.entries({ action: 'query', format: 'json', origin: '*', generator: 'search', gsrsearch: q.slice(0, 200), gsrlimit: '3',
+    prop: 'extracts|info', exintro: '1', explaintext: '1', exsentences: '3', inprop: 'url' }).forEach(([k, v]) => u.searchParams.set(k, v));
+  const res = await fetch(u);
+  if (!res.ok) throw new Error('La recherche web a échoué (code ' + res.status + ').');
+  const pages = Object.values((await res.json()).query?.pages || {}).sort((a, b) => a.index - b.index).filter((p) => p.extract && p.extract.trim());
+  if (!pages.length) return 'J’ai cherché « ' + q + ' » sur le web, mais je n’ai rien trouvé d’utile. Essayez avec d’autres mots.';
+  return 'J’ai cherché « ' + q + ' » sur le web. Voici ce que j’ai trouvé :\n\n' +
+    pages.slice(0, 2).map((p) => '**' + p.title + '**\n' + p.extract.trim() + '\n[Source](' + p.fullurl + ')').join('\n\n') +
+    '\n\n*Je n’ai pas de vrai modèle de langage : je recopie des extraits sans les comprendre.*';
+}
+
+function newConv() {
+  if (busy) return;
+  const empty = convs.find((c) => !c.messages.length);
+  if (empty) current = empty.id;
+  else { const c = { id: uid(), title: 'Nouvelle conversation', messages: [], updated: Date.now() }; convs.unshift(c); current = c.id; save(); }
+  render(); $('#input').focus(); document.body.classList.remove('open');
+}
+function renderList() {
+  const ul = $('#list'); ul.innerHTML = '';
+  [...convs].sort((a, b) => b.updated - a.updated).forEach((c) => {
+    const li = document.createElement('li'); if (c.id === current) li.className = 'on';
+    const t = document.createElement('span'); t.textContent = c.title;
+    t.onclick = () => { if (!busy) { current = c.id; render(); document.body.classList.remove('open'); } };
+    const r = document.createElement('button'); r.textContent = 'Renommer';
+    r.onclick = () => { const n = prompt('Nouveau nom', c.title); if (n && n.trim()) { c.title = n.trim().slice(0, 80); save(); render(); } };
+    const d = document.createElement('button'); d.textContent = 'Supprimer';
+    d.onclick = () => {
+      if (busy || !confirm('Supprimer cette conversation ?')) return;
+      convs = convs.filter((x) => x.id !== c.id); save();
+      current = null; convs.length ? (current = convs[0].id, render()) : newConv();
+    };
+    li.append(t, r, d); ul.append(li);
+  });
+}
+function md(text) {
+  const el = document.createElement('div'); el.className = 'body';
+  el.innerHTML = DOMPurify.sanitize(marked.parse(text, { breaks: true }));
+  el.querySelectorAll('table').forEach((t) => { const w = document.createElement('div'); w.className = 'table'; t.replaceWith(w); w.append(t); });
+  el.querySelectorAll('pre').forEach((pre) => {
+    const code = pre.querySelector('code'); const raw = pre.innerText;
+    if (code) { try { hljs.highlightElement(code); } catch (e) {} }
+    const b = document.createElement('button'); b.className = 'copy'; b.textContent = 'Copier';
+    b.onclick = () => copy(raw.trim(), b); pre.append(b);
+  });
+  return el;
+}
+async function copy(text, btn) {
+  try { await navigator.clipboard.writeText(text); const o = btn.textContent; btn.textContent = 'Copié'; setTimeout(() => (btn.textContent = o), 1500); }
+  catch (e) { showError('Copie impossible : autorisez l’accès au presse-papiers.'); }
+}
+function bubble(m) {
+  const w = document.createElement('div'); w.className = 'msg ' + m.role;
+  if (m.role === 'user') { const b = document.createElement('div'); b.className = 'body'; b.textContent = m.content; w.append(b); }
+  else {
+    w.append(md(m.content));
+    const t = document.createElement('div'); t.className = 'tools';
+    const b = document.createElement('button'); b.textContent = 'Copier la réponse'; b.onclick = () => copy(m.content, b);
+    t.append(b); w.append(t);
+  }
+  return w;
+}
+function render() {
+  const c = getConv(); $('#title').textContent = c ? c.title : '';
+  const chat = $('#chat'); chat.innerHTML = '';
+  if (c && !c.messages.length) chat.innerHTML = '<div class="empty"><h2>Comment puis-je vous aider ?</h2><p>Posez une question ou décrivez ce que vous voulez comprendre.</p></div>';
+  else if (c) c.messages.forEach((m) => chat.append(bubble(m)));
+  chat.scrollTop = chat.scrollHeight; renderList();
+}
+function showError(msg) { const b = $('#banner'); b.hidden = !msg; b.textContent = msg; }
+
+async function send(text) {
+  const c = getConv(); busy = true; $('#send').disabled = true; showError('');
+  c.messages.push({ role: 'user', content: text });
+  if (c.messages.length === 1) c.title = text.slice(0, 50);
+  c.updated = Date.now(); save(); render();
+  const chat = $('#chat');
+  const wrap = document.createElement('div'); wrap.className = 'msg assistant';
+  const body = document.createElement('div'); body.className = 'body dots'; wrap.append(body); chat.append(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  let acc = '';
+  try {
+    acc = await answer(text);
+    let shown = '';
+    for (const w of acc.match(/\S+\s*/g) || []) { shown += w; wrap.replaceChild(md(shown), wrap.firstChild); chat.scrollTop = chat.scrollHeight; await new Promise((r) => setTimeout(r, 15)); }
+  } catch (e) { acc = ''; showError(e instanceof TypeError ? 'Connexion impossible. Vérifiez votre réseau puis réessayez.' : e.message); }
+  const err = $('#banner').textContent;
+  if (acc) c.messages.push({ role: 'assistant', content: acc }); else c.messages.pop();
+  c.updated = Date.now(); save(); busy = false; $('#send').disabled = false; render();
+  if (!acc) { showError(err); $('#input').value = text; }
+}
+$('#form').onsubmit = (e) => {
+  e.preventDefault(); const i = $('#input'), v = i.value.trim();
+  if (!v || busy) return;
+  if (v.length > MAX_CHARS) return showError('Message trop long (maximum ' + MAX_CHARS + ' caractères).');
+  i.value = ''; i.style.height = 'auto'; send(v);
+};
+$('#input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#form').requestSubmit(); } });
+$('#input').addEventListener('input', (e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; });
+$('#new').onclick = newConv;
+$('#menu').onclick = () => document.body.classList.add('open');
+$('#scrim').onclick = () => document.body.classList.remove('open');
+current = convs[0] ? convs[0].id : null; if (!current) newConv(); else render();
+</script>
+</body>
+</html>
